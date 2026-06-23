@@ -1,0 +1,86 @@
+{
+  "request_timeout_seconds": {
+    "description": "HTTP 请求超时（秒）",
+    "type": "int",
+    "default": 15,
+    "hint": "调用 OneBot get_group_member_list 等接口的单次超时，修改后立即生效。"
+  },
+  "max_member_per_group": {
+    "description": "单群拉取上限（条）",
+    "type": "int",
+    "default": 5000,
+    "hint": "防止超大群拉爆 Bot；超过此数将截断并日志告警。"
+  },
+  "groups": {
+    "description": "已纳入统计的 QQ 群号列表",
+    "type": "list",
+    "default": [],
+    "hint": "建议在群内用 /qq_stats bind 命令纳入，不要手动编辑。"
+  },
+  "platform_id": {
+    "description": "指定 aiocqhttp 平台 ID",
+    "type": "string",
+    "default": "",
+    "hint": "留空时使用第一个 aiocqhttp 适配器；多机器人账号时填写具体 ID 区分。"
+  },
+  "enabled": {
+    "description": "启用后台定时采样",
+    "type": "bool",
+    "default": true,
+    "hint": "设为 false 暂停后台采样（“群人数增长”的实际人数曲线将不再积累新点）；仪表盘与命令仍可用。"
+  },
+  "startup_delay_seconds": {
+    "description": "启动后等待秒数再首次采样",
+    "type": "int",
+    "default": 15,
+    "hint": "给 AstrBot 平台适配器足够的 ready 时间。"
+  },
+  "dashboard_cache_ttl_seconds": {
+    "description": "仪表盘数据缓存有效期（秒）",
+    "type": "int",
+    "default": 120,
+    "hint": "仪表盘概览在此时间内复用上次拉取结果，避免频繁点开页面就重新拉群。点“刷新数据”可强制立即重拉。"
+  },
+  "unbound_collect_max_groups": {
+    "description": "“全部群”范围最多采集多少个未纳入群",
+    "type": "int",
+    "default": 30,
+    "hint": "仪表盘切到“全部群”时才会拉取未纳入群成员；此为单次采集的未纳入群数量上限，超出截断告警，防止拉爆 Napcat。"
+  },
+  "member_search_max_groups": {
+    "description": "按 QQ 检索时最多核查多少个群",
+    "type": "int",
+    "default": 50,
+    "hint": "“搜 QQ 在哪些群”会逐群调用 get_group_member_info；此为单次检索核查的群数量上限，超出截断。检索还有总时长预算（最多约 60 秒），超时返回已完成的部分结果。"
+  },
+  "member_search_concurrency": {
+    "description": "按 QQ 检索的并发数",
+    "type": "int",
+    "default": 6,
+    "hint": "逐群核查的并发请求数；越大越快但越压 Napcat，建议 4-10。"
+  },
+  "history_sample_interval_seconds": {
+    "description": "人数历史采样间隔（秒）",
+    "type": "int",
+    "default": 86400,
+    "hint": "“群人数增长”里真实人数曲线的落盘采样间隔；后台采样循环每轮检查，距上次≥此间隔才记一个点。默认一天一个点。改后无需重启即可生效。"
+  },
+  "sample_retry_interval_seconds": {
+    "description": "采样重试 / 暂停重查间隔（秒）",
+    "type": "int",
+    "default": 300,
+    "hint": "采集失败（如平台未就绪、Napcat 抖动）后按此间隔短重试，而非等满采样间隔；暂停期间也按此间隔轮询，使 /qq_stats resume 尽快生效。会被采样间隔封顶，最小 10s。建议 60-600。"
+  },
+  "activity_active_days": {
+    "description": "“活跃”判定天数",
+    "type": "int",
+    "default": 7,
+    "hint": "“群成员活跃度”里，最后发言距今 ≤ 此天数记为“活跃”。基于成员 last_sent_time，无需额外接口。"
+  },
+  "activity_idle_days": {
+    "description": "“较活跃”判定天数",
+    "type": "int",
+    "default": 30,
+    "hint": "最后发言距今 ≤ 此天数（且超过“活跃”阈值）记为“较活跃”，更久记为“沉默”。应 ≥ activity_active_days。"
+  }
+}

@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QQ 群成员统计中台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9; --card: #fff; --fg: #1f2329; --muted: #8a94a6;
+      --border: #e3e6eb; --primary: #4f7cff; --primary-d: #3a63db;
+      --danger: #e5484d; --ok: #2fa84f; --warn: #d98a00; --chip: #eef1f6;
+      --gold: #c8911a; --bar: #4f7cff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #1a1c1f; --card: #23262b; --fg: #e6e8ec; --muted: #9aa3b2;
+        --border: #343941; --chip: #2c3038; --gold: #e0b34a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px; line-height: 1.5;
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+    .sub { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 20; display: flex; gap: 10px; align-items: center;
+      flex-wrap: wrap; background: var(--bg); padding: 8px 0 12px;
+    }
+    button {
+      border: none; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer;
+      background: var(--primary); color: #fff; white-space: nowrap;
+    }
+    button:hover { background: var(--primary-d); }
+    button.secondary { background: var(--chip); color: var(--fg); border: 1px solid var(--border); }
+    button.mini { padding: 4px 10px; font-size: 12px; }
+    button.danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+    button.danger:hover { background: rgba(229,72,77,.1); }
+    button.danger-solid { background: var(--danger); color: #fff; }
+    button.danger-solid:hover { background: #c93b40; }
+    button.ok-btn { background: var(--ok); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .status-line { font-size: 12px; color: var(--muted); }
+    .toast { padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; margin-bottom: 12px; }
+    .toast.show { display: block; }
+    .toast.ok { background: rgba(47,168,79,.15); color: var(--ok); }
+    .toast.err { background: rgba(229,72,77,.15); color: var(--danger); }
+    .toast.warn { background: rgba(217,138,0,.15); color: var(--warn); }
+
+    /* KPI cards */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .kpi .label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+    .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; letter-spacing: .5px; }
+    .kpi .unit { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+    .kpi .foot { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .help { cursor: help; color: var(--muted); border: 1px solid var(--border); border-radius: 50%;
+      width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.failed td { color: var(--danger); }
+    .barcell { min-width: 120px; }
+    .bar { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: var(--bar); }
+    .gname { font-weight: 600; }
+    .gid { color: var(--muted); font-size: 12px; }
+    .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+    .pill.owner { background: rgba(200,145,26,.16); color: var(--gold); }
+    .pill.admin { background: rgba(79,124,255,.16); color: var(--primary); }
+    .pill.bound { background: rgba(47,168,79,.16); color: var(--ok); }
+    code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    .empty { color: var(--muted); padding: 18px 0; text-align: center; }
+    .row-flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .grow { flex: 1; }
+    input[type=text], input[type=search] {
+      padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg); color: var(--fg); font: inherit;
+    }
+
+    /* charts (ECharts) */
+    .split { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .split-chart { width: 340px; max-width: 100%; }
+    .split-main { flex: 1; min-width: 280px; }
+    .split-half { flex: 1; min-width: 280px; }
+    .chart { width: 100%; height: 300px; }
+    .chart.tall { height: 440px; }
+    .chart-empty { color: var(--muted); padding: 48px 0; text-align: center; }
+    @media (max-width: 760px) { .split-chart { width: 100%; } }
+    /* 统计范围切换 + 检索结果 */
+    .scope-toggle { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+    .toolbar select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+    .pill.unbound { background: rgba(217,138,0,.16); color: var(--warn); }
+    .sr-list { display: flex; flex-direction: column; gap: 8px; }
+    .sr-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+    .sr-item .grow { min-width: 0; }
+    .sr-sub { color: var(--muted); font-size: 12px; }
+    /* 在群数分布概述 + Top 成员群名 chips */
+    .dist-summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 2px 0 10px; }
+    .dist-stat { font-size: 12px; color: var(--muted); background: var(--chip); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
+    .dist-stat b { color: var(--fg); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .dist-stat.multi b { color: var(--warn); }
+    .chip-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0 0; }
+    /* 共同成员里「群名：名片（角色）」chip：群名截断、名片优先完整显示 */
+    .ov-chip { display: inline-flex; align-items: baseline; max-width: 100%; font-size: 11px;
+      background: var(--chip); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+    .ov-chip .ogn { color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; }
+    .ov-chip .ocard { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gchip { font-size: 11px; color: var(--muted); background: var(--chip); border: 1px solid var(--border);
+      border-radius: 6px; padding: 1px 6px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gchip.more { color: var(--primary); border-color: var(--primary); }
+    /* 群两两重叠 Top */
+    .pair-list { display: flex; flex-direction: column; gap: 8px; }
+    .pair-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+    .pair-main { flex: 1; min-width: 0; }
+    .pair-names { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .pair-names .gname { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pair-amp { color: var(--muted); }
+    .pair-bar { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; margin-top: 6px; }
+    .pair-bar > span { display: block; height: 100%; background: var(--bar); }
+    .pair-stat { text-align: right; white-space: nowrap; }
+    .pair-stat b { font-size: 15px; font-variant-numeric: tabular-nums; }
+    .pair-ratio { display: block; font-size: 11px; color: var(--muted); }
+    /* 群人数增长 */
+    .growth-tools { margin-bottom: 8px; }
+    .inline-sel { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; max-width: 260px; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .seg-btn { background: var(--bg); color: var(--muted); border: none; border-radius: 0; padding: 6px 12px; font-size: 13px; }
+    .seg-btn.active { background: var(--primary); color: #fff; }
+    .seg-btn:hover:not(.active) { background: var(--chip); }
+    .date-range { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .date-inp { padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; }
+    .date-sep { color: var(--muted); }
+    .growth-note-row { display: block; margin: 0 0 10px; }
+    /* 群成员活跃度 */
+    .act-summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
+    .act-stat { flex: 1; min-width: 130px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+    .act-stat .al { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .act-stat .av { font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .act-stat .ap { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+    .act-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+    .act-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--chip); margin-bottom: 14px; }
+    .act-bar > span { display: block; height: 100%; min-width: 1px; }
+    .silent-days { color: var(--warn); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .silent-days small { display: block; color: var(--muted); font-size: 11px; }
+    .rate-bar { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; margin-top: 6px; }
+    .rate-bar > span { display: block; height: 100%; background: var(--ok); }
+    .act-honor { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
+    .honor-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+    .honor-col { flex: 1; min-width: 240px; }
+    .honor-king { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--gold); border-radius: 8px; background: rgba(200,145,26,.08); margin-bottom: 10px; }
+    @media (prefers-color-scheme: dark) { .honor-king { background: rgba(224,179,74,.16); } }
+    .honor-king .crown { font-size: 22px; flex: none; }
+    .honor-king .grow { min-width: 0; }
+    .honor-king b { font-size: 15px; }
+
+    /* modal */
+    .modal-mask {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; z-index: 50;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-mask.show { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      width: min(880px, 100%); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal.modal-narrow { width: min(440px, 100%); }
+    .cf-body { padding: 16px; color: var(--fg); line-height: 1.6; }
+    .cf-body .cf-strong { color: var(--danger); font-weight: 600; }
+    .cf-body .cf-hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .cf-tools { justify-content: flex-end; border-bottom: none; border-top: 1px solid var(--border); }
+    .modal-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .modal-head h2 { margin: 0; }
+    .modal-head .close { margin-left: auto; }
+    .modal-tools { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .modal-body { overflow: auto; padding: 0 16px 16px; }
+    .modal-body thead th { position: sticky; top: 0; background: var(--card); z-index: 2; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--chip); object-fit: cover; display: block; }
+    .uid { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .spinner { color: var(--muted); padding: 24px; text-align: center; }
+    .legend { font-size: 11px; color: var(--muted); margin-top: 8px; }
+    /* 分页 */
+    .pager { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+    .pager:empty { display: none; }
+    .pager-info { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .modal-pager { margin-top: 0; padding: 8px 16px; border-top: 1px solid var(--border); }
+    details summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+    details[open] summary { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>QQ 群成员统计中台</h1>
+  <p class="sub">已纳入统计的 QQ 群成员统计：去重总人数、跨群重复率、各群规模与成员明细。</p>
+
+  <div class="toolbar">
+    <button id="btn-refresh">刷新数据</button>
+    <label class="scope-toggle">统计范围
+      <select id="scope-sel">
+        <option value="bound">仅统计群</option>
+        <option value="all">全部群（含未纳入）</option>
+      </select>
+    </label>
+    <button id="btn-search" class="secondary">查 QQ 在哪些群</button>
+    <button id="btn-discover" class="secondary">发现 / 管理群</button>
+    <span id="status" class="status-line"></span>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <!-- KPI -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- 群概览 -->
+  <div class="card">
+    <h2>群组概览 <span id="g-count" class="pill"></span></h2>
+    <div class="split">
+      <div class="split-chart">
+        <div class="legend" style="margin-top:0">各群规模占比（按人数）</div>
+        <div class="chart" id="chart-donut"></div>
+        <div class="chart-empty" id="chart-donut-empty" style="display:none"></div>
+      </div>
+      <div class="split-main">
+        <div id="groups-wrap"><div class="spinner">加载中…</div></div>
+        <div id="groups-pager" class="pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 群人数增长 -->
+  <div class="card">
+    <h2>群人数增长 <span class="pill">按加入时间累计 · 叠加每日采样实际人数</span></h2>
+    <div class="row-flex growth-tools">
+      <select id="growth-sel" class="inline-sel" title="选择单个群，或查看全部统计群（去重 + 各群分线）"></select>
+      <span class="seg" id="growth-bucket" title="年=全程概览，月=近一年，日=近一个月">
+        <button type="button" data-b="year" class="seg-btn">年</button>
+        <button type="button" data-b="month" class="seg-btn active">月</button>
+        <button type="button" data-b="day" class="seg-btn">日</button>
+      </span>
+      <span class="date-range">
+        <input type="date" id="growth-start" class="date-inp" title="起始日期" aria-label="起始日期" />
+        <span class="date-sep">~</span>
+        <input type="date" id="growth-end" class="date-inp" title="结束日期" aria-label="结束日期" />
+        <button type="button" id="growth-reset" class="secondary mini" title="清除自定义范围，恢复按粒度默认窗口">重置</button>
+      </span>
+    </div>
+    <div class="status-line growth-note-row" id="growth-note"></div>
+    <div class="chart tall" id="chart-growth"></div>
+    <div class="chart-empty" id="chart-growth-empty" style="display:none"></div>
+  </div>
+
+  <!-- 群成员活跃度 -->
+  <div class="card">
+    <h2>群成员活跃度 <span class="pill">按最后发言时间</span></h2>
+    <div class="row-flex growth-tools">
+      <select id="act-sel" class="inline-sel" title="选择单个群，或全部统计群（去重，按最近一次发言）"></select>
+      <span class="status-line" id="act-note"></span>
+    </div>
+    <div id="act-summary" class="act-summary"></div>
+    <div class="act-bar" id="act-bar"></div>
+    <div class="split">
+      <div class="split-half">
+        <div class="legend" style="margin-top:0">潜水成员 Top（最久未发言，可点开成员明细清理）</div>
+        <div id="act-idle"></div>
+        <div id="act-idle-pager" class="pager"></div>
+      </div>
+      <div class="split-half">
+        <div class="legend" style="margin-top:0">各群活跃率（活跃人数 ÷ 群人数）</div>
+        <div id="act-groups"></div>
+        <div id="act-groups-pager" class="pager"></div>
+      </div>
+    </div>
+    <div class="act-honor">
+      <div class="legend" style="margin-top:0">QQ 原生活跃榜 <span class="pill" id="act-honor-pill">选单个群查看</span></div>
+      <div id="act-honor-body"></div>
+    </div>
+  </div>
+
+  <!-- 重复分析 -->
+  <div class="card">
+    <h2>跨群重复分析</h2>
+    <div class="split">
+      <div class="split-half">
+        <div class="legend" style="margin-top:0">跨群分布：只在 1 个群的人已单列，下图聚焦在 ≥2 个群的成员</div>
+        <div id="dist-summary" class="dist-summary"></div>
+        <div class="chart" id="chart-dist"></div>
+        <div class="chart-empty" id="chart-dist-empty" style="display:none"></div>
+      </div>
+      <div class="split-half">
+        <div class="legend" style="margin-top:0">跨群最多的成员 Top（在 ≥2 个群）</div>
+        <div id="top-overlap"></div>
+        <div id="top-pager" class="pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 群两两重叠 Top -->
+  <div class="card">
+    <h2>群两两重叠 Top <span class="pill">共享成员最多的群对</span></h2>
+    <div id="pair-overlap"></div>
+    <div id="pair-pager" class="pager"></div>
+  </div>
+
+  <!-- 成员明细 modal -->
+  <div class="modal-mask" id="modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="m-title">群成员</h2>
+        <button class="secondary close" id="m-close">关闭</button>
+      </div>
+      <div class="modal-tools">
+        <input type="search" id="m-search" class="grow" placeholder="搜索 QQ 号 / 昵称 / 群名片…" />
+        <button id="m-export" class="secondary mini" title="导出当前群成员为 CSV">导出 CSV</button>
+        <span id="m-count" class="status-line"></span>
+        <span id="m-cap" class="status-line"></span>
+      </div>
+      <div class="modal-body">
+        <div id="m-body"><div class="spinner">加载中…</div></div>
+      </div>
+      <div id="m-pager" class="pager modal-pager"></div>
+    </div>
+  </div>
+
+  <!-- 共同成员 modal（群两两重叠 Top 下钻） -->
+  <div class="modal-mask" id="overlap-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="ov-title">共同成员</h2>
+        <button class="secondary close" id="ov-close">关闭</button>
+      </div>
+      <div class="modal-tools">
+        <input type="search" id="ov-search" class="grow" placeholder="搜索 QQ 号 / 昵称 / 名片…" />
+        <button id="ov-export" class="secondary mini" title="导出共同成员为 CSV">导出 CSV</button>
+        <span id="ov-count" class="status-line"></span>
+      </div>
+      <div class="modal-body">
+        <div id="ov-body"><div class="spinner">加载中…</div></div>
+      </div>
+      <div id="ov-pager" class="pager modal-pager"></div>
+    </div>
+  </div>
+
+  <!-- 发现/管理 modal -->
+  <div class="modal-mask" id="disc-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>发现 / 管理群</h2>
+        <button class="secondary close" id="d-close">关闭</button>
+      </div>
+      <div class="modal-tools">
+        <input type="search" id="d-search" class="grow" placeholder="搜索群号 / 群名…" />
+        <button id="d-refresh" class="secondary mini" title="忽略缓存，重新向服务器拉取群列表">刷新群列表</button>
+        <span id="d-count" class="status-line"></span>
+      </div>
+      <div class="modal-body">
+        <div id="d-body"><div class="spinner">加载中…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 查 QQ 在哪些群 modal -->
+  <div class="modal-mask" id="search-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>查 QQ 在哪些群</h2>
+        <button class="secondary close" id="s-close">关闭</button>
+      </div>
+      <div class="modal-tools">
+        <input type="search" id="s-input" class="grow" placeholder="输入 QQ 号，回车或点检索…" inputmode="numeric" />
+        <button id="s-go">检索</button>
+        <span id="s-count" class="status-line"></span>
+      </div>
+      <div class="modal-body">
+        <div id="s-body"><div class="empty">逐群实时核查机器人所在的全部群，可能需要几秒~几十秒。</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通用确认弹窗（沙箱禁用了 window.confirm，危险操作用它二次确认） -->
+  <div class="modal-mask" id="confirm-modal">
+    <div class="modal modal-narrow">
+      <div class="modal-head">
+        <h2 id="cf-title">确认操作</h2>
+      </div>
+      <div class="modal-body cf-body">
+        <div id="cf-msg"></div>
+      </div>
+      <div class="modal-tools cf-tools">
+        <button class="secondary" id="cf-cancel">取消</button>
+        <button class="danger-solid" id="cf-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 本地打包的 ECharts（6.0.0）；相对路径会被框架重写成带令牌的同源资源 URL -->
+  <script src="echarts.min.js"></script>
+  <script src="/api/plugin/page/bridge-sdk.js"></script>
+  <script>
+    "use strict";
+    const Bridge = window.AstrBotPluginPage;
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    const toastEl = $("toast");
+    let toastTimer = null;
+    function toast(msg, kind) {
+      toastEl.textContent = msg;
+      toastEl.className = "toast show " + (kind || "ok");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toastEl.className = "toast"; }, 4000);
+    }
+
+    // -------- 危险操作二次确认（沙箱禁用了 window.confirm，故自建弹窗，返回 Promise<boolean>） --------
+    let cfResolve = null;
+    function confirmDialog(opts) {
+      const o = opts || {};
+      $("cf-title").textContent = o.title || "确认操作";
+      const body = $("cf-msg");
+      body.innerHTML = "";
+      body.appendChild(el("div", null, o.message || ""));          // el 用 textContent，安全
+      if (o.strong) body.appendChild(el("div", "cf-strong", o.strong));
+      if (o.hint) body.appendChild(el("div", "cf-hint", o.hint));
+      const ok = $("cf-ok");
+      ok.textContent = o.okText || "确认";
+      $("confirm-modal").classList.add("show");
+      return new Promise((resolve) => { cfResolve = resolve; });
+    }
+    function cfSettle(val) {
+      $("confirm-modal").classList.remove("show");
+      const r = cfResolve; cfResolve = null;
+      if (r) r(val);
+    }
+
+    // -------- 格式化 --------
+    const ROLE = { owner: ["群主", "owner"], admin: ["管理员", "admin"], member: ["成员", ""] };
+    const SEX = { male: "♂", female: "♀" };
+    // 踢人权限：机器人须是管理员+（owner/admin）且严格高于目标（群主>管理员>成员）。
+    const ROLE_RANK = { owner: 3, admin: 2, member: 1 };
+    const botCanManage = (role) => role === "owner" || role === "admin";
+    function canKick(botRole, targetRole) {
+      const b = ROLE_RANK[botRole] || 0, t = ROLE_RANK[targetRole] || 0;
+      return b >= 2 && b > t;
+    }
+    function pct(x) { return (Number(x || 0) * 100).toFixed(1) + "%"; }
+    function num(x) { return Number(x || 0).toLocaleString("en-US"); }
+    // ECharts 函数式 tooltip.formatter 返回值按 HTML 注入（innerHTML），群名可被群主设成
+    // <img onerror=...>，故凡是把群名拼进 tooltip 的地方都必须先转义，防存储型 XSS。
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function avatarUrl(uid) { return "https://q1.qlogo.cn/g?b=qq&nk=" + uid + "&s=100"; }
+    function makeAvatar(uid) {
+      // uid 始终为后端校验过的数字；no-referrer 避免把仪表盘地址泄露给腾讯 CDN。
+      const img = el("img", "avatar");
+      img.src = avatarUrl(uid);
+      img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      img.onerror = () => { img.style.visibility = "hidden"; };
+      return img;
+    }
+    function fmtTime(ts) {
+      ts = Number(ts || 0);
+      if (!ts) return "—";
+      const d = new Date(ts * 1000);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+    function ago(ts) {
+      ts = Number(ts || 0);
+      if (!ts) return "从未";
+      const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+      if (s < 60) return s + " 秒前";
+      if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+      if (s < 86400) return Math.floor(s / 3600) + " 小时前";
+      return Math.floor(s / 86400) + " 天前";
+    }
+    function groupLabel(g) {
+      const name = g.group_name || g.group_a_name || "";
+      return name ? name : "群 " + (g.group_id || "");
+    }
+
+    // -------- KPI --------
+    function kpiCard(label, value, unit, foot, help) {
+      const c = el("div", "kpi");
+      const lab = el("div", "label");
+      lab.appendChild(el("span", null, label));
+      if (help) { const h = el("span", "help", "?"); h.title = help; lab.appendChild(h); }
+      c.appendChild(lab);
+      const v = el("div", "value");
+      v.appendChild(document.createTextNode(value));
+      if (unit) v.appendChild(el("span", "unit", unit));
+      c.appendChild(v);
+      if (foot) c.appendChild(el("div", "foot", foot));
+      return c;
+    }
+    function renderKPIs(ov, status) {
+      const box = $("kpis");
+      box.innerHTML = "";
+      const total = ov.total_group_count != null ? ov.total_group_count : ov.bound_group_count;
+      const foot = ov.unbound_group_count
+        ? `已纳入 ${ov.bound_group_count} · 未纳入 ${ov.unbound_group_count}`
+        : `成功 ${ov.successful_group_count} · 失败 ${ov.failed_group_count}`;
+      box.appendChild(kpiCard("统计群数", num(total), "个", foot,
+        "当前统计范围内的群数量；切到“全部群”可纳入机器人所在但尚未统计的群。"));
+      box.appendChild(kpiCard("去重总人数", num(ov.unique_members), "人", "跨所有群唯一 QQ 数",
+        "所有群成员并集去重后的人数。"));
+      box.appendChild(kpiCard("总人次", num(ov.total_occurrences), "人次", "各群人数之和",
+        "同一个人在 N 个群中被计 N 次。"));
+      box.appendChild(kpiCard("成员重复率", pct(ov.member_repeat_rate), "",
+        `${num(ov.duplicated_members)} 人在 ≥2 个群`,
+        "重复成员数 ÷ 去重总人数：有多大比例的人不止待在一个群。"));
+      box.appendChild(kpiCard("人次重复率", pct(ov.seat_repeat_rate), "", "席位被重复占用比例",
+        "(总人次 − 去重人数) ÷ 总人次。"));
+      box.appendChild(kpiCard("人均加群数", ov.avg_groups_per_member, "群", "每位成员平均加入",
+        "总人次 ÷ 去重总人数。"));
+    }
+
+    // -------- 通用分页器（前端切片，列表很长时复用） --------
+    // bodyEl：渲染当前页的容器；pagerEl：翻页控件容器；render(pageItems, bodyEl) 负责清空并渲染一页。
+    function createPager(bodyEl, pagerEl, pageSize, render) {
+      let items = [], page = 1;
+      function draw() {
+        const pages = Math.max(1, Math.ceil(items.length / pageSize));
+        page = Math.min(Math.max(1, page), pages);
+        const start = (page - 1) * pageSize;
+        render(items.slice(start, start + pageSize), bodyEl);
+        pagerEl.innerHTML = "";
+        if (pages <= 1) return;
+        const prev = el("button", "secondary mini", "‹ 上一页");
+        prev.disabled = page <= 1;
+        prev.onclick = () => { page--; draw(); };
+        const next = el("button", "secondary mini", "下一页 ›");
+        next.disabled = page >= pages;
+        next.onclick = () => { page++; draw(); };
+        pagerEl.append(prev, el("span", "pager-info", `${page} / ${pages} 页 · 共 ${num(items.length)}`), next);
+      }
+      return {
+        set(newItems, keepPage) { items = newItems || []; if (!keepPage) page = 1; draw(); },
+      };
+    }
+
+    // -------- 群概览表 --------
+    let groupsPager = null;
+    function renderGroups(groups) {
+      const wrap = $("groups-wrap");
+      $("g-count").textContent = groups.length + " 个群";
+      if (!groups.length) {
+        wrap.innerHTML = "";
+        wrap.appendChild(el("div", "empty", "还没有纳入任何群。点击右上角“发现 / 管理群”或在群内发 /qq_stats bind。"));
+        $("groups-pager").innerHTML = "";
+        return;
+      }
+      if (!groupsPager) groupsPager = createPager(wrap, $("groups-pager"), 10, renderGroupsPage);
+      groupsPager.set(groups);
+    }
+    function renderGroupsPage(groups, wrap) {
+      wrap.innerHTML = "";
+      const table = el("table");
+      const thead = el("thead");
+      thead.innerHTML =
+        "<tr><th>群</th><th class='num'>成员数</th><th>规模占比</th><th class='num'>人次占比</th><th>状态</th><th></th></tr>";
+      table.appendChild(thead);
+      const tbody = el("tbody");
+      groups.forEach((g) => {
+        const tr = el("tr", g.error ? "failed" : "");
+        const tdG = el("td");
+        const nameRow = el("div", "row-flex");
+        nameRow.appendChild(el("div", "gname", groupLabel(g)));
+        if (g.bound === false) nameRow.appendChild(el("span", "pill unbound", "未纳入"));
+        // 机器人在该群是群主/管理员才能踢人；否则标「非管理」，避免误以为能管理。
+        if (!g.error && g.bot_role && !botCanManage(g.bot_role)) {
+          const np = el("span", "pill", "非管理");
+          np.title = "机器人在本群不是管理员，无法踢人";
+          nameRow.appendChild(np);
+        } else if (g.bot_role === "owner" || g.bot_role === "admin") {
+          nameRow.appendChild(el("span", "pill admin", ROLE[g.bot_role][0]));
+        }
+        const id = el("div", "gid", g.group_id);
+        tdG.append(nameRow, id);
+
+        const tdC = el("td", "num", g.error ? "—" : num(g.member_count));
+
+        const tdBar = el("td", "barcell");
+        const bar = el("div", "bar");
+        const span = el("span"); span.style.width = (Number(g.rel_bar || 0) * 100).toFixed(1) + "%";
+        bar.appendChild(span); tdBar.appendChild(bar);
+
+        const tdShare = el("td", "num", g.error ? "—" : pct(g.share));
+
+        const tdSt = el("td");
+        tdSt.appendChild(g.error
+          ? (() => { const p = el("span", "pill"); p.style.color = "var(--danger)"; p.textContent = "拉取失败"; p.title = g.error; return p; })()
+          : el("span", "pill bound", "正常"));
+
+        const tdAct = el("td");
+        if (!g.error) {
+          const b = el("button", "secondary mini", "查看成员");
+          b.onclick = () => openMembers(g.group_id, groupLabel(g));
+          tdAct.appendChild(b);
+        }
+        tr.append(tdG, tdC, tdBar, tdShare, tdSt, tdAct);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+    }
+
+    // ==================== ECharts 图表 ====================
+    const PALETTE = ["#4f7cff", "#2fa84f", "#d98a00", "#e5484d", "#9b59b6", "#13b5b1",
+      "#e8694a", "#3aa0ff", "#8b5cf6", "#f2a93b", "#22c55e", "#ef4444"];
+    const charts = {};
+    let lastData = null;
+    const isDark = () => !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const axisColor = () => (isDark() ? "#9aa3b2" : "#8a94a6");
+    const splitColor = () => (isDark() ? "#2c3038" : "#eef1f6");
+    const chartReady = () => typeof window.echarts !== "undefined";
+    const baseOpt = () => ({ backgroundColor: "transparent", color: PALETTE, textStyle: { fontFamily: "inherit" } });
+
+    function getChart(id) {
+      if (charts[id]) { try { charts[id].dispose(); } catch (e) {} delete charts[id]; }
+      const inst = window.echarts.init($(id), isDark() ? "dark" : null, { renderer: "canvas" });
+      charts[id] = inst;
+      return inst;
+    }
+    function showChartEmpty(id, msg) {
+      if (charts[id]) { try { charts[id].dispose(); } catch (e) {} delete charts[id]; }
+      const c = $(id), e = $(id + "-empty");
+      if (c) c.style.display = "none";
+      if (e) { e.style.display = ""; e.textContent = msg; }
+    }
+    function showChart(id) {
+      const c = $(id), e = $(id + "-empty");
+      if (c) c.style.display = "";
+      if (e) e.style.display = "none";
+    }
+    function resizeCharts() {
+      Object.values(charts).forEach((c) => { try { c.resize(); } catch (e) {} });
+    }
+
+    // -------- 各群规模占比（环形） --------
+    // 饼心居中 + 图例横向置底（滚动翻页、长名截断），不再用右侧竖排图例——
+    // 群名常很长（中英混排），右侧竖排在窄容器里会溢出/挤压饼图。完整群名见右侧表格与悬浮提示。
+    function renderDonut(groups) {
+      const ok = groups.filter((g) => !g.error && g.member_count > 0);
+      if (!ok.length) { showChartEmpty("chart-donut", "暂无群成员数据"); return; }
+      showChart("chart-donut");
+      const total = ok.reduce((s, g) => s + g.member_count, 0);
+      const clip = (s) => { s = String(s || ""); return s.length > 12 ? s.slice(0, 12) + "…" : s; };
+      getChart("chart-donut").setOption(Object.assign(baseOpt(), {
+        tooltip: { trigger: "item", confine: true,
+          formatter: (p) => `${esc(p.name)}<br/>${num(p.value)} 人 (${(p.percent != null ? p.percent : 0)}%)` },
+        legend: { type: "scroll", orient: "horizontal", left: "center", bottom: 0,
+          icon: "circle", itemWidth: 10, itemHeight: 10,
+          textStyle: { color: axisColor(), fontSize: 11 }, pageTextStyle: { color: axisColor() },
+          formatter: clip },
+        title: { text: num(total), subtext: "总人次", left: "center", top: "38%", textAlign: "center",
+          textStyle: { fontSize: 20, color: isDark() ? "#e6e8ec" : "#1f2329" },
+          subtextStyle: { fontSize: 11, color: axisColor() } },
+        series: [{
+          type: "pie", radius: ["46%", "70%"], center: ["50%", "45%"], avoidLabelOverlap: true,
+          itemStyle: { borderColor: isDark() ? "#23262b" : "#fff", borderWidth: 2, borderRadius: 5 },
+          label: { show: false }, labelLine: { show: false },
+          data: ok.map((g) => ({ name: groupLabel(g), value: g.member_count })),
+        }],
+      }), true);
+    }
+
+    // -------- 在群数分布（柱状） --------
+    // "只在 1 个群"是非重复的大多数，会把 ≥2 群的重复柱压扁；故把它单列成概述，
+    // 图表只画 ≥2 群的人，让重复深度看得清。
+    function renderDistChart(dist) {
+      const summary = $("dist-summary");
+      if (summary) summary.innerHTML = "";
+      if (!dist || !dist.length) { showChartEmpty("chart-dist", "暂无数据"); return; }
+      const totalUnique = dist.reduce((s, d) => s + d.members, 0);
+      const onlyOne = (dist.find((d) => d.groups === 1) || {}).members || 0;
+      const dup = totalUnique - onlyOne;
+      const multi = dist.filter((d) => d.groups >= 2);
+
+      if (summary && totalUnique) {
+        const pct1 = (onlyOne / totalUnique * 100).toFixed(1);
+        const pct2 = (dup / totalUnique * 100).toFixed(1);
+        const stat = (val, label, cls) => {
+          const s = el("div", "dist-stat" + (cls ? " " + cls : ""));
+          s.appendChild(el("b", null, num(val)));
+          s.appendChild(document.createTextNode(` 人 ${label}`));
+          return s;
+        };
+        summary.appendChild(stat(onlyOne, `只在 1 个群 · ${pct1}%`, "single"));
+        summary.appendChild(stat(dup, `跨 ≥2 个群 · ${pct2}%`, "multi"));
+      }
+
+      if (!multi.length) { showChartEmpty("chart-dist", "没有人同时在多个群"); return; }
+      showChart("chart-dist");
+      // 直白措辞，避免“在 2 群”被误读成“群编号 2”。
+      const cats = multi.map((d) => "同时在 " + d.groups + " 个群");
+      const data = multi.map((d) => ({ value: d.members,
+        itemStyle: { color: "#d98a00", borderRadius: [4, 4, 0, 0] } }));
+      getChart("chart-dist").setOption(Object.assign(baseOpt(), {
+        tooltip: { trigger: "axis", confine: true, formatter: (p) => `${p[0].axisValue}<br/>${num(p[0].value)} 人` },
+        grid: { left: 48, right: 16, top: 24, bottom: 28 },
+        xAxis: { type: "category", data: cats, axisLabel: { color: axisColor() },
+          axisLine: { lineStyle: { color: axisColor() } } },
+        yAxis: { type: "value", minInterval: 1, axisLabel: { color: axisColor() },
+          splitLine: { lineStyle: { color: splitColor() } } },
+        series: [{ type: "bar", data, barMaxWidth: 46,
+          label: { show: true, position: "top", color: axisColor() } }],
+      }), true);
+    }
+
+    // -------- 群两两重叠 Top（替代力导向图：群一多力导向就成一团，列表用确切数字更清楚） --------
+    let pairPager = null, pairNameById = {}, pairMaxShared = 1;
+    function renderOverlapTop(pairwise, nameById) {
+      pairNameById = nameById || {};
+      const box = $("pair-overlap"), pager = $("pair-pager");
+      if (!pairwise || pairwise.available === false) {
+        box.innerHTML = ""; box.appendChild(el("div", "empty", "群数较多，已跳过两两共同成员计算。"));
+        pager.innerHTML = ""; return;
+      }
+      const pairs = (pairwise.pairs || []).filter((p) => p && p.shared > 0);
+      if (!pairs.length) {
+        box.innerHTML = ""; box.appendChild(el("div", "empty", "各群之间没有共同成员。"));
+        pager.innerHTML = ""; return;
+      }
+      pairMaxShared = Math.max(1, ...pairs.map((p) => p.shared)); // 后端已按 shared 降序，首条即最大
+      if (!pairPager) pairPager = createPager(box, pager, 10, renderOverlapTopPage);
+      pairPager.set(pairs);
+    }
+    function renderOverlapTopPage(pairs, box) {
+      box.innerHTML = "";
+      const list = el("div", "pair-list");
+      pairs.forEach((p) => {
+        const nameA = pairNameById[String(p.group_a)] || p.group_a_name || ("群 " + p.group_a);
+        const nameB = pairNameById[String(p.group_b)] || p.group_b_name || ("群 " + p.group_b);
+        const item = el("div", "pair-item");
+        const main = el("div", "pair-main");
+        const names = el("div", "pair-names");
+        const a = el("span", "gname", nameA); a.title = nameA;
+        const b = el("span", "gname", nameB); b.title = nameB;
+        names.append(a, el("span", "pair-amp", "∩"), b);
+        main.appendChild(names);
+        const bar = el("div", "pair-bar");
+        const span = el("span"); span.style.width = (p.shared / pairMaxShared * 100).toFixed(1) + "%";
+        bar.appendChild(span); main.appendChild(bar);
+        item.appendChild(main);
+        const stat = el("div", "pair-stat");
+        const cnt = el("div");
+        cnt.appendChild(el("b", null, num(p.shared)));
+        cnt.appendChild(document.createTextNode(" 人"));
+        stat.appendChild(cnt);
+        if (p.ratio != null) stat.appendChild(el("span", "pair-ratio", "占较小群 " + pct(p.ratio)));
+        item.appendChild(stat);
+        const view = el("button", "secondary mini", "查看成员");
+        view.title = "查看这两个群的共同成员";
+        view.onclick = () => openOverlap(p.group_a, nameA, p.group_b, nameB);
+        item.appendChild(view);
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+    }
+
+    // -------- 共同成员（两两重叠 Top 下钻；分页 + 搜索 + 导出） --------
+    let overlapCache = [], overlapPager = null, overlapReq = 0;
+    let overlapPair = { a: "", aName: "", b: "", bName: "" };
+    function openOverlap(a, aName, b, bName) {
+      overlapPair = { a: String(a), aName: aName, b: String(b), bName: bName };
+      const myReq = ++overlapReq; // 快速连点不同群对时，丢弃过期响应避免把数据画到错误的群名下
+      $("ov-title").textContent = aName + " ∩ " + bName;
+      $("ov-search").value = "";
+      $("ov-count").textContent = "";
+      $("ov-body").innerHTML = "<div class='spinner'>加载中…</div>";
+      $("ov-pager").innerHTML = "";
+      $("overlap-modal").classList.add("show");
+      Bridge.apiGet("overlap", { a: a, b: b })
+        .then((res) => {
+          if (myReq !== overlapReq) return;
+          overlapCache = res.members || [];
+          renderOverlapMembers(overlapCache, res.truncated);
+        })
+        .catch((e) => {
+          if (myReq !== overlapReq) return;
+          $("ov-body").innerHTML = "";
+          $("ov-body").appendChild(el("div", "empty", "加载失败：" + e.message));
+        });
+    }
+    function renderOverlapMembers(list, truncated) {
+      $("ov-count").textContent = "共 " + num(list.length) + " 人" + (truncated ? "（已截断）" : "");
+      const body = $("ov-body");
+      if (!list.length) {
+        body.innerHTML = ""; body.appendChild(el("div", "empty", "没有匹配的成员"));
+        $("ov-pager").innerHTML = ""; return;
+      }
+      if (!overlapPager) overlapPager = createPager(body, $("ov-pager"), 50, renderOverlapMembersPage);
+      overlapPager.set(list);
+    }
+    function ovGroupChip(groupName, card, role) {
+      // 「群名：名片（角色）」：群名截断、名片优先完整显示；仅群主/管理员才标角色
+      let cardTxt = card || "—";
+      const r = ROLE[role];
+      if (r && r[1]) cardTxt += "（" + r[0] + "）";
+      const chip = el("span", "ov-chip");
+      chip.appendChild(el("span", "ogn", groupName + "："));
+      chip.appendChild(el("span", "ocard", cardTxt));
+      chip.title = groupName + "：" + cardTxt;
+      return chip;
+    }
+    function renderOverlapMembersPage(list, body) {
+      body.innerHTML = "";
+      const wrap = el("div", "sr-list");
+      list.forEach((m) => {
+        const item = el("div", "sr-item");
+        item.appendChild(makeAvatar(m.user_id));
+        const meta = el("div", "grow");
+        meta.appendChild(el("div", "gname", m.display));
+        meta.appendChild(el("div", "uid", "QQ " + m.user_id +
+          (m.nickname && m.nickname !== m.display ? " · " + m.nickname : "")));
+        const chips = el("div", "chip-row");
+        chips.appendChild(ovGroupChip(overlapPair.aName, m.card_a, m.role_a));
+        chips.appendChild(ovGroupChip(overlapPair.bName, m.card_b, m.role_b));
+        meta.appendChild(chips);
+        item.appendChild(meta);
+        wrap.appendChild(item);
+      });
+      body.appendChild(wrap);
+    }
+    function filterOverlap() {
+      const q = $("ov-search").value.trim().toLowerCase();
+      if (!q) { renderOverlapMembers(overlapCache); return; }
+      renderOverlapMembers(overlapCache.filter((m) =>
+        String(m.user_id).includes(q) ||
+        (m.nickname || "").toLowerCase().includes(q) ||
+        (m.display || "").toLowerCase().includes(q) ||
+        (m.card_a || "").toLowerCase().includes(q) ||
+        (m.card_b || "").toLowerCase().includes(q)));
+    }
+    function exportOverlapCsv() {
+      if (!overlapCache.length) { toast("没有可导出的共同成员", "warn"); return; }
+      const headers = ["QQ号", "昵称", overlapPair.aName + " 名片", overlapPair.aName + " 角色",
+        overlapPair.bName + " 名片", overlapPair.bName + " 角色"];
+      const lines = [headers.map(csvCell).join(",")];
+      overlapCache.forEach((m) => {
+        lines.push([
+          m.user_id, m.nickname || "",
+          m.card_a || "", (ROLE[m.role_a] || ["成员"])[0],
+          m.card_b || "", (ROLE[m.role_b] || ["成员"])[0],
+        ].map(csvCell).join(","));
+      });
+      const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = el("a");
+      a.href = url;
+      a.download = `共同成员_${overlapPair.a}_${overlapPair.b}_${nowStamp()}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      toast(`已导出 ${num(overlapCache.length)} 名共同成员`, "ok");
+    }
+
+    // -------- 统一渲染图表（供首次加载与主题切换复用） --------
+    function renderCharts(data) {
+      const ov = (data && data.overview) || {};
+      if (!chartReady()) {
+        ["chart-donut", "chart-dist"]
+          .forEach((id) => showChartEmpty(id, "图表库未能加载"));
+        return;
+      }
+      renderDonut(ov.groups || []);
+      renderDistChart(ov.distribution || []);
+    }
+
+    // -------- 群人数增长（留存=按加入时间累计 + 真实=落盘记录，两条线叠加） --------
+    // growthBucket 同时决定聚合粒度与默认可视窗口：年=全程，月=近12个月，日=近1个月。
+    // growthStart/growthEnd 为自定义范围（yyyy-mm-dd，空=按粒度默认），纯客户端裁剪，不重新拉取。
+    let growthData = null, growthGroup = "all", growthBucket = "month";
+    let growthStart = "", growthEnd = "";
+    function buildGrowthSel(groups) {
+      const sel = $("growth-sel");
+      sel.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "all"; all.textContent = "全部统计群（去重 + 各群分线）";
+      sel.appendChild(all);
+      (groups || []).forEach((g) => {
+        const o = document.createElement("option");
+        o.value = String(g.group_id);
+        o.textContent = g.group_name || ("群 " + g.group_id);
+        sel.appendChild(o);
+      });
+      // 保持当前选择（群可能已不在列表）
+      if (!Array.from(sel.options).some((o) => o.value === growthGroup)) growthGroup = "all";
+      sel.value = growthGroup;
+    }
+    async function loadGrowth() {
+      try {
+        const res = await Bridge.apiGet("growth", { group: growthGroup, bucket: growthBucket });
+        growthData = res;
+        buildGrowthSel(res.groups || []);
+        renderGrowth(res);
+      } catch (e) {
+        growthData = null;
+        showChartEmpty("chart-growth", "加载失败：" + e.message);
+        $("growth-note").textContent = "";
+      }
+    }
+    // 各群线配色（避开总曲线蓝 / 实际线绿，按 series 顺序循环取用）
+    const GROWTH_PALETTE = ["#e8923c", "#9b59b6", "#16a2b8", "#d6536d", "#7a8b3a",
+      "#c0883a", "#5a6acf", "#3aa17e", "#b5544f", "#8e7cc3"];
+    const MS_DAY = 86400000;
+    // 轴/提示日期按所选粒度格式化（UTC，与服务端分桶口径一致）。
+    function fmtDateBy(bucket, v) {
+      const d = new Date(v);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      if (bucket === "year") return `${y}`;
+      if (bucket === "day") return `${y}-${m}-${day}`;
+      return `${y}-${m}`;
+    }
+    function fmtInputDate(ms) {
+      const d = new Date(ms);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    }
+    // 各粒度默认可视窗口（相对最新数据点）：年=全程，月=近12个月，日=近1个月；下限不早于数据起点。
+    function defaultWindow(bucket, dataMin, dataMax) {
+      if (bucket === "year") return [dataMin, dataMax];
+      // 用天数回退而非 setUTCMonth：后者在月末（如 1/31 减 1 月）会溢出到下个月。
+      const msBack = bucket === "day" ? 30 * MS_DAY : 365 * MS_DAY; // 近 1 个月 / 近 12 个月
+      return [Math.max(dataMax - msBack, dataMin), dataMax];
+    }
+    // 把累计曲线裁剪到 [a,b]：两端补「累计基线点」，使曲线进/出窗口取值正确、y 轴只按窗口内缩放。
+    function clipPairs(pairs, a, b) {
+      if (!pairs.length) return [];
+      let baseAt = null, endAt = null;
+      for (const p of pairs) {
+        if (p[0] <= a) baseAt = p[1];
+        if (p[0] <= b) endAt = p[1];
+      }
+      const out = [];
+      if (baseAt !== null) out.push([a, baseAt]);
+      // 含右边界点（<= b）：落在窗口末端的真实点应保留其符号样式，而非被无样式的合成点替换。
+      for (const p of pairs) if (p[0] > a && p[0] <= b) out.push(p);
+      if (endAt !== null && (!out.length || out[out.length - 1][0] !== b)) out.push([b, endAt]);
+      return out;
+    }
+    function renderGrowth(res) {
+      const series = (res && res.series) || [];
+      const bucket = (res && res.bucket) || "month";
+      const unknown = (res && res.unknown_join) || 0;
+      const omitted = (res && res.omitted) || 0;
+
+      if (!chartReady()) { showChartEmpty("chart-growth", "图表库未能加载"); return; }
+
+      // 过滤非法时间戳并转毫秒；统计数据整体范围。
+      const toMs = (arr) => (arr || [])
+        .filter((p) => p && Number.isFinite(p.ts) && p.ts > 0)
+        .map((p) => [p.ts * 1000, p.count]);
+      const raw = series.map((s) => ({ s, pairs: toMs(s.points) }));
+      let dataMin = Infinity, dataMax = -Infinity;
+      raw.forEach((r) => r.pairs.forEach((p) => {
+        if (p[0] < dataMin) dataMin = p[0];
+        if (p[0] > dataMax) dataMax = p[0];
+      }));
+      const hasData = Number.isFinite(dataMin) && Number.isFinite(dataMax);
+
+      // 计算窗口：自定义优先（结束日取当天 23:59:59），否则按粒度默认。
+      let winStart = dataMin, winEnd = dataMax;
+      if (hasData) {
+        const [dStart, dEnd] = defaultWindow(bucket, dataMin, dataMax);
+        const cs = growthStart ? Date.parse(growthStart + "T00:00:00Z") : NaN;
+        const ce = growthEnd ? Date.parse(growthEnd + "T00:00:00Z") + MS_DAY - 1000 : NaN;
+        winStart = Number.isFinite(cs) ? cs : dStart;
+        winEnd = Number.isFinite(ce) ? ce : dEnd;
+        if (winEnd < winStart) { const t = winStart; winStart = winEnd; winEnd = t; }
+        // 日期选择器限制在数据范围内，避免选到空区间。
+        const lo = fmtInputDate(dataMin), hi = fmtInputDate(dataMax);
+        $("growth-start").min = lo; $("growth-start").max = hi;
+        $("growth-end").min = lo; $("growth-end").max = hi;
+      }
+
+      const hasActual = raw.some((r) => r.s.kind === "actual" && r.pairs.length);
+      const custom = !!(growthStart || growthEnd);
+      const parts = [];
+      if (hasData) parts.push(`${custom ? "自定义范围" : "范围"} ${fmtDateBy(bucket, winStart)} ~ ${fmtDateBy(bucket, winEnd)}`);
+      if (unknown) parts.push(`${num(unknown)} 名成员加入时间未知、未计入`);
+      parts.push("彩色实线按成员加入时间累计、反映留存（退群者不计入）");
+      parts.push(hasActual
+        ? "绿色「实际人数」为每日采样的真实净人数"
+        : "绿色「实际人数」曲线将随每日采样逐步积累");
+      if (omitted) parts.push(`另有 ${num(omitted)} 个较小的群未单独画线`);
+      $("growth-note").textContent = parts.join("；") + "。";
+
+      if (!hasData) {
+        showChartEmpty("chart-growth", "暂无数据：成员加入时间缺失，或实际曲线尚未开始采样。"); return;
+      }
+
+      // 裁剪到窗口后再判空，使「年/月/日」与自定义范围都只展示该跨度。
+      const clipped = raw.map((r) => ({ s: r.s, data: clipPairs(r.pairs, winStart, winEnd) }));
+      if (!clipped.some((c) => c.data.length)) {
+        showChartEmpty("chart-growth", "所选时间范围内暂无数据。"); return;
+      }
+      showChart("chart-growth");
+
+      let gi = 0;
+      const ecSeries = clipped.map(({ s, data }) => {
+        const base = { name: s.name, type: "line", connectNulls: true, data };
+        if (s.kind === "total") {
+          return Object.assign(base, {
+            smooth: true, showSymbol: false, z: 5,
+            lineStyle: { width: 2.5, color: "#4f7cff" }, itemStyle: { color: "#4f7cff" },
+            areaStyle: { color: isDark() ? "rgba(79,124,255,.15)" : "rgba(79,124,255,.12)" },
+          });
+        }
+        if (s.kind === "actual") {
+          return Object.assign(base, {
+            showSymbol: true, symbolSize: 6, z: 4,
+            lineStyle: { width: 2, color: "#2fa84f" }, itemStyle: { color: "#2fa84f" },
+          });
+        }
+        const c = GROWTH_PALETTE[gi++ % GROWTH_PALETTE.length];
+        return Object.assign(base, {
+          smooth: true, showSymbol: false,
+          lineStyle: { width: 1.5, color: c }, itemStyle: { color: c },
+        });
+      });
+
+      const xAxis = { type: "time", min: winStart, max: winEnd,
+        axisLabel: { color: axisColor(), formatter: (v) => fmtDateBy(bucket, v) },
+        axisLine: { lineStyle: { color: axisColor() } } };
+      // 年视图强制刻度≥1年，避免半年一格导致「2021 2021 2022…」重复年份。
+      if (bucket === "year") xAxis.minInterval = 365 * MS_DAY;
+      else if (bucket === "month") xAxis.minInterval = 27 * MS_DAY;
+      getChart("chart-growth").setOption(Object.assign(baseOpt(), {
+        tooltip: { trigger: "axis", confine: true, formatter: (ps) => {
+          if (!ps || !ps.length) return "";  // 时间轴边缘可能空触发
+          const lines = [fmtDateBy(bucket, ps[0].value[0])];
+          ps.forEach((p) => lines.push(`${p.marker}${esc(p.seriesName)}：${num(p.value[1])} 人`));
+          return lines.join("<br/>");
+        } },
+        legend: { type: "scroll", top: 0, textStyle: { color: axisColor() } },
+        grid: { left: 52, right: 20, top: 36, bottom: 28 },
+        xAxis: xAxis,
+        yAxis: { type: "value", scale: true, minInterval: 1, axisLabel: { color: axisColor() },
+          splitLine: { lineStyle: { color: splitColor() } } },
+        series: ecSeries,
+      }), true);
+    }
+
+    // -------- 群成员活跃度（按 last_sent_time 分布 + QQ 原生活跃榜） --------
+    let actData = null, actGroup = "all";
+    let idlePager = null, actGroupsPager = null;
+    // [桶 key, 中文名, 颜色]：活跃绿 / 较活跃蓝 / 沉默橙 / 无记录灰
+    const ACT_META = [
+      ["active", "活跃", "#2fa84f"],
+      ["semi", "较活跃", "#4f7cff"],
+      ["idle", "沉默", "#d98a00"],
+      ["unknown", "无记录", "#8a94a6"],
+    ];
+    function buildActSel(groups) {
+      const sel = $("act-sel");
+      sel.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "all"; all.textContent = "全部统计群（去重）";
+      sel.appendChild(all);
+      (groups || []).forEach((g) => {
+        const o = document.createElement("option");
+        o.value = String(g.group_id);
+        o.textContent = g.group_name || ("群 " + g.group_id);
+        sel.appendChild(o);
+      });
+      if (!Array.from(sel.options).some((o) => o.value === actGroup)) actGroup = "all";
+      sel.value = actGroup;
+    }
+    let actReq = 0;
+    async function loadActivity() {
+      const grp = actGroup, myReq = ++actReq; // 快速切群时丢弃过期响应
+      try {
+        const res = await Bridge.apiGet("activity", { group: grp });
+        if (myReq !== actReq) return;
+        actData = res;
+        buildActSel(res.groups || []);
+        renderActivity(res);
+        loadHonor(grp, myReq); // 仅单群时真正拉取，自带错误处理
+      } catch (e) {
+        if (myReq !== actReq) return;
+        actData = null;
+        $("act-note").textContent = "加载失败：" + e.message;
+        $("act-summary").innerHTML = ""; $("act-bar").innerHTML = "";
+      }
+    }
+    function renderActivity(res) {
+      const d = res.distribution || {};
+      const total = res.total || 0, known = res.known || 0;
+      const parts = [`活跃=${res.active_days} 天内发言、较活跃=${res.idle_days} 天内`];
+      if (!known) parts.push("后端未提供发言时间，无法判定活跃度");
+      else parts.push(`活跃率 ${pct(res.active_rate)}（${num(d.active || 0)}/${num(total)} 人 ${res.active_days} 天内发言）`);
+      if (d.unknown) parts.push(`${num(d.unknown)} 人无发言记录（从未发言或后端未提供）`);
+      $("act-note").textContent = parts.join("；") + "。";
+
+      // 四个分桶统计块
+      const sum = $("act-summary"); sum.innerHTML = "";
+      ACT_META.forEach(([k, label, color]) => {
+        const c = d[k] || 0;
+        const box = el("div", "act-stat");
+        const lab = el("div", "al");
+        const dot = el("span", "act-dot"); dot.style.background = color;
+        lab.append(dot, document.createTextNode(label));
+        box.appendChild(lab);
+        const v = el("div", "av");
+        v.appendChild(document.createTextNode(num(c)));
+        if (total) v.appendChild(el("span", "ap", pct(c / total)));
+        box.appendChild(v);
+        sum.appendChild(box);
+      });
+
+      // 比例条（按占比拼接彩色段）
+      const bar = $("act-bar"); bar.innerHTML = "";
+      ACT_META.forEach(([k, label, color]) => {
+        const c = d[k] || 0;
+        if (!total || !c) return;
+        const seg = el("span");
+        seg.style.background = color;
+        seg.style.width = (c / total * 100) + "%";
+        seg.title = `${label}：${num(c)}（${pct(c / total)}）`;
+        bar.appendChild(seg);
+      });
+
+      if (!idlePager) idlePager = createPager($("act-idle"), $("act-idle-pager"), 6, renderIdlePage);
+      idlePager.set(res.idle_top || []);
+      if (!actGroupsPager) actGroupsPager = createPager($("act-groups"), $("act-groups-pager"), 6, renderActGroupPage);
+      actGroupsPager.set(res.group_rates || []);
+    }
+    function renderIdlePage(rows, box) {
+      box.innerHTML = "";
+      if (!rows.length) { box.appendChild(el("div", "empty", "没有可统计的潜水成员（成员均近期活跃或无发言记录）")); return; }
+      const list = el("div", "sr-list");
+      rows.forEach((r) => {
+        const item = el("div", "sr-item");
+        item.appendChild(makeAvatar(r.user_id));
+        const meta = el("div", "grow");
+        meta.appendChild(el("div", "gname", r.display));
+        meta.appendChild(el("div", "uid", "QQ " + r.user_id + (r.group_name ? " · " + r.group_name : "")));
+        item.appendChild(meta);
+        const right = el("div", "silent-days");
+        right.appendChild(document.createTextNode(num(r.silent_days) + " 天未发言"));
+        right.appendChild(el("small", null, fmtTime(r.last_sent_time)));
+        item.appendChild(right);
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+    }
+    function renderActGroupPage(rows, box) {
+      box.innerHTML = "";
+      if (!rows.length) { box.appendChild(el("div", "empty", "暂无群可统计")); return; }
+      const list = el("div", "sr-list");
+      rows.forEach((g) => {
+        const item = el("div", "sr-item");
+        const meta = el("div", "grow");
+        const top = el("div", "row-flex");
+        top.appendChild(el("div", "gname", g.group_name || ("群 " + g.group_id)));
+        top.appendChild(el("span", "pill", num(g.active) + " / " + num(g.member_count) + " 活跃"));
+        meta.appendChild(top);
+        const rb = el("div", "rate-bar");
+        const span = el("span"); span.style.width = (Number(g.active_rate || 0) * 100) + "%";
+        rb.appendChild(span);
+        meta.appendChild(rb);
+        item.appendChild(meta);
+        const right = el("div", "pair-stat");
+        const b = el("b", null, pct(g.active_rate)); right.appendChild(b);
+        item.appendChild(right);
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+    }
+
+    // -------- QQ 原生活跃榜（get_group_honor_info，单群按需拉） --------
+    // grp/reqToken 由 loadActivity 传入以共享代次，丢弃过期响应；缺省时回退当前值。
+    async function loadHonor(grp, reqToken) {
+      if (grp == null) grp = actGroup;
+      const myReq = reqToken != null ? reqToken : actReq;
+      const pill = $("act-honor-pill"), body = $("act-honor-body");
+      if (grp === "all") {
+        pill.textContent = "选单个群查看";
+        body.innerHTML = "";
+        body.appendChild(el("div", "empty", "QQ 龙王 / 活跃榜按群维护，请在上方选择单个群查看。"));
+        return;
+      }
+      pill.textContent = "加载中…";
+      body.innerHTML = "<div class='spinner'>加载中…</div>";
+      try {
+        const res = await Bridge.apiGet("honor", { group: grp });
+        if (myReq !== actReq) return;
+        renderHonor(res);
+      } catch (e) {
+        if (myReq !== actReq) return;
+        pill.textContent = "加载失败";
+        body.innerHTML = "";
+        body.appendChild(el("div", "empty", "获取活跃榜失败：" + e.message));
+      }
+    }
+    // 榜单短名 -> 展示标题
+    const HONOR_TITLES = [
+      ["performer", "群聊之火（活跃）"],
+      ["talkative", "历史龙王"],
+      ["legend", "群聊炽焰（传说）"],
+      ["emotion", "快乐源泉"],
+      ["strong_newbie", "冒尖小春笋（新人）"],
+    ];
+    function honorRow(it) {
+      const item = el("div", "sr-item");
+      item.appendChild(makeAvatar(it.user_id));
+      const meta = el("div", "grow");
+      meta.appendChild(el("div", "gname", it.nickname || ("QQ " + it.user_id)));
+      if (it.description) meta.appendChild(el("div", "uid", it.description));
+      item.appendChild(meta);
+      return item;
+    }
+    function renderHonor(res) {
+      const pill = $("act-honor-pill"), body = $("act-honor-body");
+      body.innerHTML = "";
+      const lists = res.lists || {};
+      const king = res.current_talkative;
+      // 当前龙王
+      if (king && king.user_id) {
+        const k = el("div", "honor-king");
+        k.appendChild(el("span", "crown", "👑"));
+        const meta = el("div", "grow");
+        const line = el("div");
+        line.appendChild(el("b", null, king.nickname || ("QQ " + king.user_id)));
+        line.appendChild(document.createTextNode("　当前龙王"));
+        meta.appendChild(line);
+        if (king.day_count) meta.appendChild(el("div", "uid", "连续 " + num(king.day_count) + " 天"));
+        k.appendChild(meta);
+        body.appendChild(k);
+      }
+      // 各榜单（仅渲染非空的）
+      const grid = el("div", "honor-grid");
+      let shown = 0;
+      HONOR_TITLES.forEach(([key, title]) => {
+        const items = lists[key] || [];
+        if (!items.length) return;
+        shown++;
+        const col = el("div", "honor-col");
+        col.appendChild(el("div", "legend", title));
+        const list = el("div", "sr-list");
+        items.slice(0, 10).forEach((it) => list.appendChild(honorRow(it)));
+        col.appendChild(list);
+        grid.appendChild(col);
+      });
+      if (!king && !shown) {
+        body.appendChild(el("div", "empty", "该群暂无 QQ 荣誉数据（群活跃度不足或机器人无权限）。"));
+        pill.textContent = "无数据";
+        return;
+      }
+      pill.textContent = "QQ 官方";
+      if (shown) body.appendChild(grid);
+    }
+
+    // -------- 跨群 Top（内联展示所在群名，不必 hover；分页） --------
+    let topPager = null, topNameById = {};
+    function renderTopOverlap(rows, nameById) {
+      topNameById = nameById || {};
+      const box = $("top-overlap");
+      if (!rows || !rows.length) {
+        box.innerHTML = ""; box.appendChild(el("div", "empty", "没有跨群成员"));
+        $("top-pager").innerHTML = ""; return;
+      }
+      if (!topPager) topPager = createPager(box, $("top-pager"), 8, renderTopOverlapPage);
+      topPager.set(rows);
+    }
+    function renderTopOverlapPage(rows, box) {
+      box.innerHTML = "";
+      const MAXC = 6; // 群名 chips 上限，超出折叠成 "+N"
+      const list = el("div", "sr-list");
+      rows.forEach((r) => {
+        const item = el("div", "sr-item");
+        item.appendChild(makeAvatar(r.user_id));
+        const meta = el("div", "grow");
+        const top = el("div", "row-flex");
+        top.appendChild(el("div", "gname", r.display));
+        top.appendChild(el("span", "pill admin", r.group_count + " 个群"));
+        top.appendChild(el("span", "uid", r.user_id));
+        meta.appendChild(top);
+        const chips = el("div", "chip-row");
+        const gids = r.groups || [];
+        gids.slice(0, MAXC).forEach((gid) => {
+          const nm = topNameById[String(gid)] || ("群 " + gid);
+          const chip = el("span", "gchip", nm);
+          chip.title = nm + "（" + gid + "）";
+          chips.appendChild(chip);
+        });
+        if (gids.length > MAXC) {
+          const more = el("span", "gchip more", "+" + (gids.length - MAXC));
+          more.title = "另有 " + (gids.length - MAXC) + " 个群";
+          chips.appendChild(more);
+        }
+        meta.appendChild(chips);
+        item.appendChild(meta);
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+    }
+
+    // -------- 成员明细 modal --------
+    let memberCache = [];
+    let currentGroup = { id: "", name: "", botRole: "unknown" };
+    function openMembers(gid, name) {
+      currentGroup = { id: String(gid), name: name, botRole: "unknown" };
+      $("m-title").textContent = name + " · 成员";
+      $("m-search").value = "";
+      $("m-count").textContent = "";
+      $("m-cap").textContent = "";
+      $("m-body").innerHTML = "<div class='spinner'>加载中…</div>";
+      $("m-pager").innerHTML = "";
+      $("modal").classList.add("show");
+      const myId = String(gid);
+      Bridge.apiGet("group/" + gid + "/members")
+        .then((res) => {
+          if (currentGroup.id !== myId) return; // 已切到别的群，丢弃过期响应
+          currentGroup.botRole = res.bot_role || "unknown";
+          const cap = $("m-cap");
+          if (botCanManage(currentGroup.botRole)) {
+            cap.textContent = "机器人在本群：" + (ROLE[currentGroup.botRole] || ["成员"])[0] + "，可踢人";
+            cap.style.color = "var(--muted)";
+          } else {
+            cap.textContent = "⚠ 机器人在本群非管理员，无法踢人";
+            cap.style.color = "var(--warn)";
+          }
+          if (res.error) { $("m-body").innerHTML = ""; $("m-body").appendChild(el("div", "empty", "拉取失败：" + res.error)); return; }
+          memberCache = res.members || [];
+          renderMembers(memberCache);
+        })
+        .catch((e) => { $("m-body").innerHTML = ""; $("m-body").appendChild(el("div", "empty", "加载失败：" + e.message)); });
+    }
+    let membersPager = null;
+    function renderMembers(list) {
+      $("m-count").textContent = "共 " + num(list.length) + " 人";
+      const body = $("m-body");
+      if (!list.length) {
+        body.innerHTML = ""; body.appendChild(el("div", "empty", "没有匹配的成员"));
+        $("m-pager").innerHTML = ""; return;
+      }
+      if (!membersPager) membersPager = createPager(body, $("m-pager"), 50, renderMembersPage);
+      membersPager.set(list);
+    }
+    function renderMembersPage(list, body) {
+      body.innerHTML = "";
+      const table = el("table");
+      const thead = el("thead");
+      thead.innerHTML =
+        "<tr><th></th><th>QQ / 昵称</th><th>群名片 / 头衔</th><th>角色</th><th>加入时间</th><th>最后发言</th><th></th></tr>";
+      table.appendChild(thead);
+      const tbody = el("tbody");
+      list.forEach((m) => {
+        const tr = el("tr");
+        const tdA = el("td");
+        tdA.appendChild(makeAvatar(m.user_id));
+
+        const tdN = el("td");
+        const nick = el("div", "gname");
+        nick.textContent = (m.nickname || "(无昵称)") + (SEX[m.sex] ? " " + SEX[m.sex] : "");
+        tdN.appendChild(nick);
+        tdN.appendChild(el("div", "uid", m.user_id));
+
+        const tdC = el("td");
+        if (m.card) tdC.appendChild(el("div", null, m.card));
+        if (m.title) { const t = el("span", "pill", "🏷 " + m.title); tdC.appendChild(t); }
+        if (!m.card && !m.title) tdC.appendChild(el("span", "uid", "—"));
+
+        const role = ROLE[m.role] || ["成员", ""];
+        const tdR = el("td");
+        tdR.appendChild(el("span", "pill " + (role[1] || ""), role[0]));
+
+        const tdK = el("td");
+        if (canKick(currentGroup.botRole, m.role)) {
+          const kb = el("button", "danger mini", "踢出");
+          kb.onclick = () => kickMember(m);
+          tdK.appendChild(kb);
+        } else {
+          // 机器人非管理员、或目标是群主/管理员（权限不足）→ 不给踢出按钮
+          const dash = el("span", "uid", "—");
+          dash.title = botCanManage(currentGroup.botRole)
+            ? "目标是群主 / 管理员，机器人权限不足"
+            : "机器人在本群非管理员，无法踢人";
+          tdK.appendChild(dash);
+        }
+
+        tr.append(tdA, tdN, tdC, tdR, el("td", null, fmtTime(m.join_time)), el("td", null, fmtTime(m.last_sent_time)), tdK);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+    }
+    function filterMembers() {
+      const q = $("m-search").value.trim().toLowerCase();
+      if (!q) { renderMembers(memberCache); return; }
+      renderMembers(memberCache.filter((m) =>
+        String(m.user_id).includes(q) ||
+        (m.nickname || "").toLowerCase().includes(q) ||
+        (m.card || "").toLowerCase().includes(q)));
+    }
+
+    // -------- 踢出群成员（危险，二次确认） --------
+    async function kickMember(m) {
+      const nick = m.card || m.nickname || String(m.user_id);
+      const ok = await confirmDialog({
+        title: "踢出群成员",
+        message: `确定把该成员踢出「${currentGroup.name}」？`,
+        strong: `${nick}（${m.user_id}）`,
+        hint: "成员将被移出该群，操作不可撤销。",
+        okText: "踢出",
+      });
+      if (!ok) return;
+      try {
+        await Bridge.apiPost("group/" + currentGroup.id + "/kick", { user_id: m.user_id });
+        toast("已踢出 " + nick, "ok");
+        memberCache = memberCache.filter((x) => x.user_id !== m.user_id);
+        filterMembers(); // 就地移除该行（沿用当前搜索过滤）
+      } catch (e) {
+        toast("踢出失败：" + e.message, "err");
+      }
+    }
+
+    // -------- 导出群成员 CSV（沙箱 allow-downloads 支持 Blob 下载） --------
+    function csvCell(v) {
+      v = String(v == null ? "" : v);
+      // 防 CSV 公式注入：群名/名片可被设成 =cmd()、@、+、- 开头，Excel/WPS 会当公式执行
+      if (/^[=+\-@]/.test(v)) v = "'" + v;
+      return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    function nowStamp() {
+      const d = new Date(), p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    }
+    function exportMembersCsv() {
+      if (!memberCache.length) { toast("没有可导出的成员", "warn"); return; }
+      const SEXC = { male: "男", female: "女" };
+      const headers = ["QQ号", "昵称", "群名片", "角色", "性别", "头衔", "加入时间", "最后发言"];
+      const lines = [headers.map(csvCell).join(",")];
+      memberCache.forEach((m) => {
+        lines.push([
+          m.user_id, m.nickname || "", m.card || "", (ROLE[m.role] || ["成员"])[0],
+          SEXC[m.sex] || "未知", m.title || "", fmtTime(m.join_time), fmtTime(m.last_sent_time),
+        ].map(csvCell).join(","));
+      });
+      const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }); // BOM 防 Excel 乱码
+      const url = URL.createObjectURL(blob);
+      const a = el("a");
+      a.href = url;
+      a.download = `群成员_${currentGroup.id || "export"}_${nowStamp()}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      toast(`已导出 ${num(memberCache.length)} 名成员`, "ok");
+    }
+
+    // -------- 发现 / 管理 modal --------
+    let discCache = [];
+    function openDiscover(force) {
+      $("d-search").value = "";
+      $("d-count").textContent = "";
+      $("d-body").innerHTML =
+        "<div class='spinner'>" + (force ? "忽略缓存，重新拉取机器人群列表中…" : "拉取机器人群列表中…") + "</div>";
+      $("disc-modal").classList.add("show");
+      $("d-refresh").disabled = true;
+      // force=true 时带 refresh=1，让 OneBot 忽略缓存重拉（机器人新进/退群后刷新用）。
+      Bridge.apiGet("discover", force ? { refresh: 1 } : {})
+        .then((res) => {
+          discCache = res.groups || [];
+          $("d-count").textContent = `机器人共在 ${num(discCache.length)} 个群 · 已纳入 ${num(res.bound_count || 0)}`;
+          renderDiscover(discCache, res.orphan_bound || []);
+          if (force) toast("已刷新群列表", "ok");
+        })
+        .catch((e) => { $("d-body").innerHTML = ""; $("d-body").appendChild(el("div", "empty", "获取失败：" + e.message)); })
+        .finally(() => { $("d-refresh").disabled = false; });
+    }
+    function renderDiscover(list, orphan) {
+      const body = $("d-body");
+      body.innerHTML = "";
+      if (orphan && orphan.length) {
+        const warn = el("div", "toast warn show");
+        warn.style.marginBottom = "12px";
+        warn.textContent = "以下已纳入统计的群号在机器人群列表中找不到（可能已退群）：" + orphan.join("、");
+        body.appendChild(warn);
+      }
+      if (!list.length) { body.appendChild(el("div", "empty", "机器人没有加入任何群")); return; }
+      const table = el("table");
+      const thead = el("thead");
+      thead.innerHTML = "<tr><th>群</th><th class='num'>人数</th><th>统计状态</th><th></th></tr>";
+      table.appendChild(thead);
+      const tbody = el("tbody");
+      list.forEach((g) => {
+        const tr = el("tr");
+        const tdG = el("td");
+        tdG.appendChild(el("div", "gname", g.group_name || ("群 " + g.group_id)));
+        tdG.appendChild(el("div", "gid", g.group_id));
+        const tdC = el("td", "num", g.member_count ? num(g.member_count) : "—");
+        const tdS = el("td");
+        tdS.appendChild(g.bound ? el("span", "pill bound", "已纳入") : el("span", "pill", "未纳入"));
+        const tdA = el("td");
+        const acts = el("div", "row-flex");
+        const btn = el("button", g.bound ? "secondary mini" : "ok-btn mini", g.bound ? "移出统计" : "纳入统计");
+        btn.title = g.bound ? "从统计列表移出（不影响机器人在群）" : "纳入统计列表";
+        btn.onclick = () => toggleBind(g, btn);
+        acts.appendChild(btn);
+        const leaveBtn = el("button", "danger mini", "退群");
+        leaveBtn.title = "机器人退出该群（不可逆）";
+        leaveBtn.onclick = () => leaveGroup(g, leaveBtn);
+        acts.appendChild(leaveBtn);
+        tdA.appendChild(acts);
+        tr.append(tdG, tdC, tdS, tdA);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+    }
+    function filterDiscover() {
+      const q = $("d-search").value.trim().toLowerCase();
+      const list = !q ? discCache : discCache.filter((g) =>
+        String(g.group_id).includes(q) || (g.group_name || "").toLowerCase().includes(q));
+      renderDiscover(list, []);
+    }
+    async function toggleBind(g, btn) {
+      btn.disabled = true;
+      try {
+        await Bridge.apiPost(g.bound ? "unbind" : "bind", { group_id: g.group_id });
+        g.bound = !g.bound;
+        toast((g.bound ? "已纳入统计 " : "已移出统计 ") + (g.group_name || g.group_id), "ok");
+        renderDiscover(discCache, []);
+        load(false); // 刷新主面板的群数（用缓存，不重新拉群）
+      } catch (e) {
+        toast("操作失败：" + e.message, "err");
+        btn.disabled = false;
+      }
+    }
+
+    // -------- 机器人退群（危险，二次确认） --------
+    async function leaveGroup(g, btn) {
+      const nm = g.group_name || ("群 " + g.group_id);
+      const ok = await confirmDialog({
+        title: "机器人退群",
+        message: `确定让机器人退出「${nm}」？`,
+        strong: "群号 " + g.group_id,
+        hint: "机器人将离开该群并自动移出统计列表；之后如需统计需重新被拉入群。操作不可撤销。",
+        okText: "退群",
+      });
+      if (!ok) return;
+      btn.disabled = true;
+      try {
+        await Bridge.apiPost("leave", { group_id: g.group_id });
+        toast("已退出 " + nm, "ok");
+        discCache = discCache.filter((x) => String(x.group_id) !== String(g.group_id));
+        $("d-count").textContent =
+          `机器人共在 ${num(discCache.length)} 个群 · 已纳入 ${num(discCache.filter((x) => x.bound).length)}`;
+        renderDiscover(discCache, []);
+        load(false); // 缓存已在后端失效，刷新主面板
+      } catch (e) {
+        toast("退群失败：" + e.message, "err");
+        btn.disabled = false;
+      }
+    }
+
+    // -------- 查 QQ 在哪些群（实时逐群核查） --------
+    function openSearch() {
+      $("s-input").value = "";
+      $("s-count").textContent = "";
+      $("s-body").innerHTML = "";
+      $("s-body").appendChild(el("div", "empty", "逐群实时核查机器人所在的全部群，可能需要几秒~几十秒。"));
+      $("search-modal").classList.add("show");
+      setTimeout(() => $("s-input").focus(), 50);
+    }
+    async function doSearch() {
+      const uid = $("s-input").value.trim();
+      if (!/^[1-9]\d{4,}$/.test(uid)) { toast("请输入有效 QQ 号", "warn"); return; }
+      $("s-go").disabled = true;
+      $("s-count").textContent = "逐群核查中…";
+      $("s-body").innerHTML = "";
+      $("s-body").appendChild(el("div", "spinner", "逐群实时核查中，请稍候…"));
+      try {
+        const res = await Bridge.apiGet("member/" + uid + "/groups");
+        renderSearchResult(uid, res);
+      } catch (e) {
+        $("s-body").innerHTML = "";
+        $("s-body").appendChild(el("div", "empty", "检索失败：" + e.message));
+        $("s-count").textContent = "";
+      } finally {
+        $("s-go").disabled = false;
+      }
+    }
+    function renderSearchResult(uid, res) {
+      const body = $("s-body");
+      body.innerHTML = "";
+      const groups = res.groups || [];
+      $("s-count").textContent =
+        `核查 ${num(res.checked_groups)} 群 · 命中 ${num(res.found_count)}` +
+        (res.uncertain ? ` · ${res.uncertain} 个超时未定` : "") +
+        (res.unfinished ? ` · ${res.unfinished} 个未完成` : "") +
+        (res.truncated ? " · 超上限已截断" : "");
+      const head = el("div", "sr-item");
+      head.appendChild(makeAvatar(uid));
+      const hmeta = el("div", "grow");
+      hmeta.appendChild(el("div", "gname", "QQ " + uid));
+      hmeta.appendChild(el("div", "sr-sub",
+        groups.length ? `在 ${groups.length} 个群` : "未在任何已核查的群中找到"));
+      head.appendChild(hmeta);
+      body.appendChild(head);
+      if (!groups.length) return;
+      const list = el("div", "sr-list");
+      groups.forEach((g) => {
+        const item = el("div", "sr-item");
+        const meta = el("div", "grow");
+        const top = el("div", "row-flex");
+        top.appendChild(el("div", "gname", g.group_name || ("群 " + g.group_id)));
+        top.appendChild(g.bound ? el("span", "pill bound", "已纳入") : el("span", "pill unbound", "未纳入"));
+        const role = ROLE[g.role] || ["成员", ""];
+        top.appendChild(el("span", "pill " + (role[1] || ""), role[0]));
+        meta.appendChild(top);
+        const parts = ["群号 " + g.group_id];
+        if (g.card) parts.push("名片 " + g.card);
+        if (g.title) parts.push("头衔 " + g.title);
+        parts.push("加入 " + fmtTime(g.join_time));
+        meta.appendChild(el("div", "sr-sub", parts.join(" · ")));
+        item.appendChild(meta);
+        list.appendChild(item);
+      });
+      body.appendChild(list);
+    }
+
+    // -------- 主加载 --------
+    async function load(force) {
+      $("btn-refresh").disabled = true;
+      const scope = $("scope-sel") ? $("scope-sel").value : "bound";
+      $("status").textContent = force
+        ? "正在拉取最新数据…"
+        : (scope === "all" ? "加载中（含未纳入群，可能较慢）…" : "加载中…");
+      try {
+        const params = { scope };
+        if (force) params.refresh = 1;
+        const res = await Bridge.apiGet("overview", params);
+        lastData = res;
+        const ov = res.overview || {};
+        renderKPIs(ov, res.status || {});
+        renderGroups(ov.groups || []);
+        const nameById = {};
+        (ov.groups || []).forEach((g) => { nameById[String(g.group_id)] = groupLabel(g); });
+        renderTopOverlap(res.top_overlap || [], nameById);
+        renderOverlapTop(res.pairwise || {}, nameById);
+        renderCharts(res);
+        loadGrowth(); // 独立拉取（统计群口径），自带错误处理，不阻塞主面板
+        loadActivity(); // 同上：活跃度独立拉取
+        const st = res.status || {};
+        $("status").textContent =
+          `范围 ${st.scope === "all" ? "全部群" : "仅统计群"} · ` +
+          `采集于 ${fmtTime(st.fetched_at)}（${ago(st.fetched_at)}） · ` +
+          `采样 ${st.enabled ? "开" : "关"} · 上次采样 ${st.last_sampled_at ? ago(st.last_sampled_at) : "无"}` +
+          (st.last_error ? ` · 上次错误：${st.last_error}` : "");
+        if ((res.errors || []).length) toast("部分群拉取失败：" + res.errors.join("；"), "warn");
+      } catch (e) {
+        $("status").textContent = "";
+        toast("加载失败：" + e.message, "err");
+      } finally {
+        $("btn-refresh").disabled = false;
+      }
+    }
+
+    // -------- 纳入 / 移出统计 --------
+    function closeAllModals() {
+      ["modal", "overlap-modal", "disc-modal", "search-modal"].forEach((id) => $(id).classList.remove("show"));
+    }
+    function bind() {
+      $("btn-refresh").onclick = () => load(true);
+      $("btn-discover").onclick = () => openDiscover(false);
+      $("btn-search").onclick = openSearch;
+      $("scope-sel").onchange = () => load(false);
+      $("growth-sel").onchange = () => { growthGroup = $("growth-sel").value; loadGrowth(); };
+      const clearGrowthRange = () => {
+        growthStart = ""; growthEnd = "";
+        $("growth-start").value = ""; $("growth-end").value = "";
+      };
+      $("growth-bucket").querySelectorAll(".seg-btn").forEach((b) => {
+        b.onclick = () => {
+          growthBucket = b.getAttribute("data-b");
+          $("growth-bucket").querySelectorAll(".seg-btn").forEach((x) => x.classList.toggle("active", x === b));
+          clearGrowthRange(); // 切换粒度回到该粒度的默认窗口
+          loadGrowth();       // 重新拉取（服务端按新粒度分桶）
+        };
+      });
+      // 自定义日期：纯客户端裁剪，已有数据时无需重新拉取。
+      const applyGrowthRange = () => {
+        growthStart = $("growth-start").value || "";
+        growthEnd = $("growth-end").value || "";
+        if (growthData) renderGrowth(growthData);
+      };
+      $("growth-start").onchange = applyGrowthRange;
+      $("growth-end").onchange = applyGrowthRange;
+      $("growth-reset").onclick = () => { clearGrowthRange(); if (growthData) renderGrowth(growthData); };
+      $("act-sel").onchange = () => { actGroup = $("act-sel").value; loadActivity(); };
+      $("m-close").onclick = () => $("modal").classList.remove("show");
+      $("d-close").onclick = () => $("disc-modal").classList.remove("show");
+      $("d-refresh").onclick = () => openDiscover(true);
+      $("s-close").onclick = () => $("search-modal").classList.remove("show");
+      $("s-go").onclick = doSearch;
+      $("s-input").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+      $("m-search").oninput = filterMembers;
+      $("m-export").onclick = exportMembersCsv;
+      $("ov-close").onclick = () => $("overlap-modal").classList.remove("show");
+      $("ov-search").oninput = filterOverlap;
+      $("ov-export").onclick = exportOverlapCsv;
+      $("d-search").oninput = filterDiscover;
+      $("cf-cancel").onclick = () => cfSettle(false);
+      $("cf-ok").onclick = () => cfSettle(true);
+      $("confirm-modal").onclick = (e) => { if (e.target === $("confirm-modal")) cfSettle(false); };
+      [$("modal"), $("overlap-modal"), $("disc-modal"), $("search-modal")].forEach((mask) => {
+        mask.onclick = (e) => { if (e.target === mask) mask.classList.remove("show"); };
+      });
+      window.addEventListener("resize", resizeCharts);
+      // 跟随系统深浅色切换：销毁并按新主题重绘图表（用已缓存数据，不重新拉群）。
+      if (window.matchMedia) {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const onTheme = () => { if (lastData) renderCharts(lastData); if (growthData) renderGrowth(growthData); };
+        if (mq.addEventListener) mq.addEventListener("change", onTheme);
+        else if (mq.addListener) mq.addListener(onTheme);
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        // 确认弹窗优先：Esc 视作取消（并兑现 Promise），不连带关掉下层弹窗。
+        if ($("confirm-modal").classList.contains("show")) { cfSettle(false); return; }
+        closeAllModals();
+      });
+    }
+
+    if (!Bridge) {
+      document.body.innerHTML =
+        "<p style='color:#e5484d'>未检测到插件页面 Bridge，请在 AstrBot 仪表盘的插件详情页中打开本页面。</p>";
+    } else {
+      bind();
+      Bridge.ready().then(() => load(false)).catch(() => load(false));
+    }
+  </script>
+</body>
+</html>
