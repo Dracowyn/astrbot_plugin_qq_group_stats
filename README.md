@@ -1,12 +1,12 @@
 # astrbot_plugin_qq_group_stats
 
-> QQ 群成员统计中台 —— 内置「群成员统计中台」WebUI 页面的 AstrBot 插件
+> 内置「群成员统计中台」WebUI 看板的 AstrBot 插件 —— 多 QQ 群成员的去重、重复率、活跃度与人数增长可视化
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.25-blue)](https://github.com/AstrBotDevs/AstrBot)
 ![platform](https://img.shields.io/badge/platform-aiocqhttp-green)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-一个面向 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在 AstrBot 仪表盘里内置一个插件页面，把所有已纳入统计的群的成员数据汇总成可视化看板——各群规模、去重总人数、**跨群重复率/重叠分析**、单群成员明细、成员活跃度，并支持在网页里发现 / 纳入 / 移出统计群。纯本地运行，不向任何外部服务上报数据。
+一个面向 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的插件：在 AstrBot 仪表盘里内置一个插件页面，把所有已纳入统计的群成员数据汇总成可视化看板——各群规模、去重总人数、**跨群重复率/重叠分析**、单群成员明细、成员活跃度，并支持在网页里发现 / 纳入 / 移出统计群。
 
 ---
 
@@ -42,7 +42,7 @@
 
 ### 🗂 人数历史落盘
 
-后台采样循环按 `history_sample_interval_seconds`（默认一天一次）拉取统计群成员、去重计数，把真实净人数落盘到 `data/plugin_data/astrbot_plugin_qq_group_stats/member_history.json`，供「群人数增长」的「实际人数」曲线随时间积累。数据只存在本地，不向任何外部服务上报。
+后台采样循环按 `history_sample_interval_seconds`（默认一天一次）拉取统计群成员、去重计数，把真实净人数落盘到 `data/plugin_data/astrbot_plugin_qq_group_stats/member_history.json`，供「群人数增长」的「实际人数」曲线随时间积累。
 
 ---
 
