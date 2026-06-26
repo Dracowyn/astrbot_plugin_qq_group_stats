@@ -186,6 +186,9 @@
     .modal-tools { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .modal-body { overflow: auto; padding: 0 16px 16px; }
     .modal-body thead th { position: sticky; top: 0; background: var(--card); z-index: 2; }
+    .modal-body thead th.sortable { cursor: pointer; -webkit-user-select: none; user-select: none; }
+    .modal-body thead th.sortable:hover { color: var(--fg); }
+    .modal-body thead th.sortable.active { color: var(--primary); }
     .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--chip); object-fit: cover; display: block; }
     .uid { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .spinner { color: var(--muted); padding: 24px; text-align: center; }
@@ -1316,10 +1319,13 @@
     // -------- 成员明细 modal --------
     let memberCache = [];
     let currentGroup = { id: "", name: "", botRole: "unknown" };
+    let memberSort = { key: "", dir: 1 }; // 成员明细排序：key 空=接口原始顺序，dir 1 升 / -1 降
     function openMembers(gid, name) {
       currentGroup = { id: String(gid), name: name, botRole: "unknown" };
       $("m-title").textContent = name + " · 成员";
       $("m-search").value = "";
+      memberSort = { key: "", dir: 1 }; // 每个群从原始顺序开始
+
       $("m-count").textContent = "";
       $("m-cap").textContent = "";
       $("m-body").innerHTML = "<div class='spinner'>加载中…</div>";
@@ -1344,6 +1350,40 @@
         })
         .catch((e) => { $("m-body").innerHTML = ""; $("m-body").appendChild(el("div", "empty", "加载失败：" + e.message)); });
     }
+    // -------- 成员排序（点击表头切换升 / 降序；未选则保持接口原始顺序，通常按入群先后） --------
+    const MEMBER_SORT = {
+      user_id: (m) => Number(m.user_id) || 0,
+      role: (m) => ROLE_RANK[m.role] || 0,
+      join_time: (m) => Number(m.join_time) || 0,
+      last_sent_time: (m) => Number(m.last_sent_time) || 0,
+    };
+    function applyMemberSort(list) {
+      const f = MEMBER_SORT[memberSort.key];
+      if (!f) return list;
+      const dir = memberSort.dir;
+      return list.slice().sort((a, b) => {
+        const va = f(a), vb = f(b);
+        if (va < vb) return -dir;
+        if (va > vb) return dir;
+        return (Number(a.user_id) || 0) - (Number(b.user_id) || 0); // 稳定次级键：同值按 QQ 号
+      });
+    }
+    function sortMembersBy(key) {
+      if (memberSort.key === key) memberSort.dir = -memberSort.dir;
+      else memberSort = { key: key, dir: 1 };
+      filterMembers(); // 沿用当前搜索过滤重渲染，applyMemberSort 在 renderMembers 内生效
+    }
+    function memberHeadCell(label, key) {
+      const th = el("th");
+      if (!key) { th.textContent = label; return th; }
+      const active = memberSort.key === key;
+      th.className = "sortable" + (active ? " active" : "");
+      th.textContent = label + (active ? (memberSort.dir > 0 ? " ▲" : " ▼") : "");
+      th.title = "点击排序（再次点击切换升 / 降序）";
+      th.onclick = () => sortMembersBy(key);
+      return th;
+    }
+
     let membersPager = null;
     function renderMembers(list) {
       $("m-count").textContent = "共 " + num(list.length) + " 人";
@@ -1353,14 +1393,23 @@
         $("m-pager").innerHTML = ""; return;
       }
       if (!membersPager) membersPager = createPager(body, $("m-pager"), 50, renderMembersPage);
-      membersPager.set(list);
+      membersPager.set(applyMemberSort(list));
     }
     function renderMembersPage(list, body) {
       body.innerHTML = "";
       const table = el("table");
       const thead = el("thead");
-      thead.innerHTML =
-        "<tr><th></th><th>QQ / 昵称</th><th>群名片 / 头衔</th><th>角色</th><th>加入时间</th><th>最后发言</th><th></th></tr>";
+      const htr = el("tr");
+      htr.append(
+        memberHeadCell("", ""),
+        memberHeadCell("QQ / 昵称", "user_id"),
+        memberHeadCell("群名片 / 头衔", ""),
+        memberHeadCell("角色", "role"),
+        memberHeadCell("加入时间", "join_time"),
+        memberHeadCell("最后发言", "last_sent_time"),
+        memberHeadCell("", ""),
+      );
+      thead.appendChild(htr);
       table.appendChild(thead);
       const tbody = el("tbody");
       list.forEach((m) => {
