@@ -1,10 +1,10 @@
 name: astrbot_plugin_qq_group_stats
 display_name: QQ 群成员统计中台
-desc: 在 AstrBot 仪表盘内置「群成员统计中台」WebUI 看板：多 QQ 群成员去重总数、跨群重复率/重叠分析、单群成员明细（排序/导出/踢人）、活跃度与人数增长曲线，并支持按 QQ 号检索在哪些群、发现/纳入/移出统计群。
+desc: 在 AstrBot 面板里查看多个 QQ 群的成员情况：每个群多少人、所有群合起来实际有多少不同的人、谁同时在好几个群、谁最近很少发言、人数怎么变化。还能搜一个 QQ 号在你哪些群、导出成员名单、直接踢人。
 author: dracowyn
 version: 1.0.0
 repo: https://github.com/Dracowyn/astrbot_plugin_qq_group_stats
-short_desc: QQ 群成员统计中台（WebUI 可视化看板）
+short_desc: 多 QQ 群成员统计可视化看板
 tags:
   - 群统计
   - 群成员
