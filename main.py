@@ -317,8 +317,8 @@ class QQGroupStatsPlugin(Star):
     async def _sample_loop(self) -> None:
         """后台按采样间隔拉一次绑定群成员，落盘真实净人数（供“群人数增长”实际曲线）。
 
-        采样是这个循环唯一的职责——无任何外部上报。HistoryStore 内部还会按
-        ``min_interval`` 节流，循环按同一间隔醒来即可。
+        采样是这个循环唯一的职责。HistoryStore 内部还会按 ``min_interval`` 节流，
+        循环按同一间隔醒来即可。
         """
         try:
             while True:
